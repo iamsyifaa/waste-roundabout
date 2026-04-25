@@ -1,0 +1,90 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- ENUMS ---
+enum Role {
+  FARMER
+  COLLECTOR
+  ADMIN
+}
+
+enum WastePostStatus {
+  AVAILABLE
+  BOOKED
+  SOLD
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+}
+
+// --- MODELS ---
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  name         String?
+  password     String
+  role         Role          @default(FARMER)
+  points       Int           @default(0) // Pastikan namanya 'points' bukan 'total_points'
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  wastePosts   WastePost[]
+  transactions Transaction[]
+  pointLogs    PointLog[]
+}
+
+model WasteCategory {
+  id             String      @id @default(uuid())
+  name           String      @unique
+  description    String?
+  basePricePerKg Float       @default(0.0) // Gunakan camelCase agar sinkron dengan Controller
+  wastePosts     WastePost[]
+}
+
+model WastePost {
+  id          String          @id @default(uuid())
+  title       String
+  description String
+  imageUrl    String?
+  weight      Float
+  status      WastePostStatus @default(AVAILABLE)
+  postedById  String
+  postedBy    User            @relation(fields: [postedById], references: [id])
+  categoryId  String
+  category    WasteCategory   @relation(fields: [categoryId], references: [id])
+  transaction Transaction?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model Transaction {
+  id            String            @id @default(uuid())
+  wastePostId   String            @unique
+  wastePost     WastePost         @relation(fields: [wastePostId], references: [id])
+  collectorId   String
+  collector     User              @relation(fields: [collectorId], references: [id])
+  pointsAwarded Int
+  finalPrice    Float             @default(0.0)
+  status        TransactionStatus @default(PENDING)
+  createdAt     DateTime          @default(now())
+}
+
+model PointLog {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  points      Int
+  description String
+  createdAt   DateTime @default(now())
+}
