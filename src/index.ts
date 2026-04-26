@@ -1,12 +1,12 @@
-import express from 'express';
+import express from "express";
 const app = express();
 
-app.get('/', (req, res) => {
-  const name = process.env.NAME || 'World';
+app.get("/", (req, res) => {
+  const name = process.env.NAME || "Syifa";
   res.send(`Hello ${name}!`);
 });
 
-const port = parseInt(process.env.PORT || '3000');
+const port = parseInt(process.env.PORT || "3000");
 app.listen(port, () => {
-  console.log(`listening on port ${port}`);
+  console.log("Halo dari server!");
 });
