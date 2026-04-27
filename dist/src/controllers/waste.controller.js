@@ -38,95 +38,79 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCategories = exports.getAllWastes = exports.createWaste = void 0;
 var client_1 = require("@prisma/client");
-var zod_schema_1 = require("../utils/zod.schema");
 var prisma = new client_1.PrismaClient();
-// Corrected the role to FARMER as per your schema
-var FARMER_ROLE = client_1.Role.FARMER;
 var createWaste = function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-    var validation, _a, title, description, weight, categoryId, imageUrl, wastePost, error_1;
+    var _a, title, description, weight, categoryId, imageUrl, newPost, error_1;
     return __generator(this, function (_b) {
         switch (_b.label) {
             case 0:
-                _b.trys.push([0, 2, , 3]);
-                if (!req.user) {
-                    return [2 /*return*/, res.status(401).json({ message: 'Unauthorized' })];
+                if (!req.user || req.user.role !== client_1.Role.FARMER) {
+                    return [2 /*return*/, res.status(403).json({ message: 'Hanya Farmer yang bisa posting limbah.' })];
                 }
-                if (req.user.role !== FARMER_ROLE) {
-                    return [2 /*return*/, res
-                            .status(403)
-                            .json({ message: "Forbidden: Only ".concat(FARMER_ROLE, "s can create waste entries.") })];
+                _a = req.body, title = _a.title, description = _a.description, weight = _a.weight, categoryId = _a.categoryId, imageUrl = _a.imageUrl;
+                if (weight <= 0) {
+                    return [2 /*return*/, res.status(400).json({ message: 'Berat limbah harus lebih dari 0 kg.' })];
                 }
-                validation = zod_schema_1.wasteSchema.safeParse(req.body);
-                if (!validation.success) {
-                    return [2 /*return*/, res.status(400).json({ errors: validation.error.format() })];
-                }
-                _a = validation.data, title = _a.title, description = _a.description, weight = _a.weight, categoryId = _a.categoryId, imageUrl = _a.imageUrl;
+                _b.label = 1;
+            case 1:
+                _b.trys.push([1, 3, , 4]);
                 return [4 /*yield*/, prisma.wastePost.create({
                         data: {
                             title: title,
                             description: description,
                             weight: weight,
                             imageUrl: imageUrl,
-                            postedBy: {
-                                connect: { id: req.user.id },
-                            },
-                            category: {
-                                connect: { id: categoryId },
-                            },
-                            // The status defaults to AVAILABLE from the schema
+                            categoryId: categoryId,
+                            postedById: req.user.id,
+                            status: client_1.WastePostStatus.AVAILABLE,
                         },
                     })];
-            case 1:
-                wastePost = _b.sent();
-                res.status(201).json(wastePost);
-                return [3 /*break*/, 3];
             case 2:
+                newPost = _b.sent();
+                res.status(201).json(newPost);
+                return [3 /*break*/, 4];
+            case 3:
                 error_1 = _b.sent();
-                console.error(error_1);
-                res.status(500).json({ message: 'Internal server error' });
-                return [3 /*break*/, 3];
-            case 3: return [2 /*return*/];
+                res.status(500).json({ message: 'Gagal membuat postingan limbah.' });
+                return [3 /*break*/, 4];
+            case 4: return [2 /*return*/];
         }
     });
 }); };
 exports.createWaste = createWaste;
-var getAllWastes = function (_req, res) { return __awaiter(void 0, void 0, void 0, function () {
-    var wastes, error_2;
-    return __generator(this, function (_a) {
-        switch (_a.label) {
+var getAllWastes = function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
+    var _a, categoryId, lat, long, where, wastes, error_2;
+    return __generator(this, function (_b) {
+        switch (_b.label) {
             case 0:
-                _a.trys.push([0, 2, , 3]);
-                return [4 /*yield*/, prisma.wastePost.findMany({
-                        // Corrected the where clause to use the status enum
-                        where: { status: client_1.WastePostStatus.AVAILABLE },
-                        include: {
-                            category: true,
-                            // Corrected the relation name from 'farmer' to 'postedBy'
-                            postedBy: {
-                                select: {
-                                    id: true,
-                                    name: true,
-                                    email: true,
-                                    role: true,
-                                },
-                            },
-                        },
-                    })];
+                _a = req.query, categoryId = _a.categoryId, lat = _a.lat, long = _a.long;
+                where = {
+                    status: client_1.WastePostStatus.AVAILABLE,
+                };
+                if (categoryId) {
+                    where.categoryId = categoryId;
+                }
+                _b.label = 1;
             case 1:
-                wastes = _a.sent();
-                res.status(200).json(wastes);
-                return [3 /*break*/, 3];
+                _b.trys.push([1, 3, , 4]);
+                return [4 /*yield*/, prisma.wastePost.findMany({
+                        where: where,
+                        include: { category: true, postedBy: { select: { name: true, email: true } } },
+                    })];
             case 2:
-                error_2 = _a.sent();
-                console.error(error_2);
-                res.status(500).json({ message: 'Internal server error' });
-                return [3 /*break*/, 3];
-            case 3: return [2 /*return*/];
+                wastes = _b.sent();
+                res.status(200).json(wastes);
+                return [3 /*break*/, 4];
+            case 3:
+                error_2 = _b.sent();
+                res.status(500).json({ message: 'Gagal mengambil data.' });
+                return [3 /*break*/, 4];
+            case 4: return [2 /*return*/];
         }
     });
 }); };
 exports.getAllWastes = getAllWastes;
-var getCategories = function (_req, res) { return __awaiter(void 0, void 0, void 0, function () {
+var getCategories = function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
     var categories, error_3;
     return __generator(this, function (_a) {
         switch (_a.label) {
@@ -139,8 +123,7 @@ var getCategories = function (_req, res) { return __awaiter(void 0, void 0, void
                 return [3 /*break*/, 3];
             case 2:
                 error_3 = _a.sent();
-                console.error(error_3);
-                res.status(500).json({ message: 'Internal server error' });
+                res.status(500).json({ message: 'Gagal mengambil kategori.' });
                 return [3 /*break*/, 3];
             case 3: return [2 /*return*/];
         }

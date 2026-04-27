@@ -39,59 +39,55 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.completeTransaction = exports.createTransaction = void 0;
 var client_1 = require("@prisma/client");
 var prisma = new client_1.PrismaClient();
-// Only COLLECTORs can initiate transactions
 var createTransaction = function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-    var wastePostId, transactionResult, error_1;
+    var waste_post_id, transactionResult, error_1;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
                 if (!req.user || req.user.role !== client_1.Role.COLLECTOR) {
-                    return [2 /*return*/, res.status(403).json({ message: 'Forbidden: Only collectors can create transactions.' })];
+                    return [2 /*return*/, res.status(403).json({ message: 'Forbidden: Hanya Collector yang bisa membeli.' })];
                 }
-                wastePostId = req.body.wastePostId;
-                if (!wastePostId) {
-                    return [2 /*return*/, res.status(400).json({ message: 'wastePostId is required' })];
-                }
+                waste_post_id = req.body.waste_post_id;
                 _a.label = 1;
             case 1:
                 _a.trys.push([1, 3, , 4]);
                 return [4 /*yield*/, prisma.$transaction(function (tx) { return __awaiter(void 0, void 0, void 0, function () {
                         var wastePost, finalPrice, newTransaction;
-                        return __generator(this, function (_a) {
-                            switch (_a.label) {
+                        var _a;
+                        return __generator(this, function (_b) {
+                            switch (_b.label) {
                                 case 0: return [4 /*yield*/, tx.wastePost.findUnique({
-                                        where: { id: wastePostId },
+                                        where: { id: waste_post_id },
                                         include: { category: true },
                                     })];
                                 case 1:
-                                    wastePost = _a.sent();
-                                    // 2. Check if the waste is available for transaction
-                                    if (!wastePost) {
-                                        throw new Error('Waste post not found.');
-                                    }
-                                    if (wastePost.status !== client_1.WastePostStatus.AVAILABLE) {
-                                        throw new Error("Waste is already ".concat(wastePost.status, "."));
+                                    wastePost = _b.sent();
+                                    if (!wastePost)
+                                        throw new Error('Postingan limbah tidak ditemukan.');
+                                    if (wastePost.status !== client_1.WastePostStatus.AVAILABLE)
+                                        throw new Error('Limbah sudah tidak tersedia.');
+                                    // VALIDASI: Farmer dilarang beli limbahnya sendiri
+                                    if (wastePost.postedById === ((_a = req.user) === null || _a === void 0 ? void 0 : _a.id)) {
+                                        throw new Error('Anda tidak bisa membeli limbah Anda sendiri.');
                                     }
                                     finalPrice = wastePost.weight * wastePost.category.basePricePerKg;
                                     return [4 /*yield*/, tx.transaction.create({
                                             data: {
                                                 collectorId: req.user.id,
-                                                wastePostId: wastePostId,
-                                                pointsAwarded: 0, // Points are awarded upon completion
+                                                wastePostId: waste_post_id,
+                                                pointsAwarded: 0,
                                                 finalPrice: finalPrice,
                                                 status: client_1.TransactionStatus.PENDING,
                                             },
                                         })];
                                 case 2:
-                                    newTransaction = _a.sent();
-                                    // 5. Update the waste post status to BOOKED
+                                    newTransaction = _b.sent();
                                     return [4 /*yield*/, tx.wastePost.update({
-                                            where: { id: wastePostId },
+                                            where: { id: waste_post_id },
                                             data: { status: client_1.WastePostStatus.BOOKED },
                                         })];
                                 case 3:
-                                    // 5. Update the waste post status to BOOKED
-                                    _a.sent();
+                                    _b.sent();
                                     return [2 /*return*/, newTransaction];
                             }
                         });
@@ -102,87 +98,76 @@ var createTransaction = function (req, res) { return __awaiter(void 0, void 0, v
                 return [3 /*break*/, 4];
             case 3:
                 error_1 = _a.sent();
-                console.error('Transaction failed:', error_1);
-                res.status(400).json({ message: error_1.message || 'Could not create transaction.' });
+                res.status(400).json({ message: error_1.message || 'Gagal membuat transaksi.' });
                 return [3 /*break*/, 4];
             case 4: return [2 /*return*/];
         }
     });
 }); };
 exports.createTransaction = createTransaction;
-// COLLECTORs or ADMINs can complete transactions
 var completeTransaction = function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-    var transactionId, pointsToAward_1, result, error_2;
+    var id, result, error_2;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
-                if (!req.user || (req.user.role !== client_1.Role.COLLECTOR && req.user.role !== client_1.Role.ADMIN)) {
-                    return [2 /*return*/, res.status(403).json({ message: 'Forbidden: Only collectors or admins can complete transactions.' })];
-                }
-                transactionId = req.params.id;
+                id = req.params.id;
                 _a.label = 1;
             case 1:
                 _a.trys.push([1, 3, , 4]);
-                pointsToAward_1 = 10;
                 return [4 /*yield*/, prisma.$transaction(function (tx) { return __awaiter(void 0, void 0, void 0, function () {
-                        var transaction, farmer, updatedTransaction, updatedFarmer, pointLog;
+                        var transaction, updatedTransaction;
                         return __generator(this, function (_a) {
                             switch (_a.label) {
                                 case 0: return [4 /*yield*/, tx.transaction.findUnique({
-                                        where: { id: transactionId },
-                                        include: { wastePost: { include: { postedBy: true } } },
+                                        where: { id: id },
+                                        include: { wastePost: true },
                                     })];
                                 case 1:
                                     transaction = _a.sent();
-                                    // 2. Validate the transaction
-                                    if (!transaction) {
-                                        throw new Error('Transaction not found.');
-                                    }
+                                    if (!transaction)
+                                        throw new Error('Transaksi tidak ditemukan.');
+                                    // VALIDASI: Hanya bisa selesaikan jika status masih PENDING
                                     if (transaction.status !== client_1.TransactionStatus.PENDING) {
-                                        throw new Error("Transaction is already ".concat(transaction.status, "."));
+                                        throw new Error('Transaksi ini sudah selesai atau dibatalkan.');
                                     }
-                                    farmer = transaction.wastePost.postedBy;
                                     return [4 /*yield*/, tx.transaction.update({
-                                            where: { id: transactionId },
-                                            data: { status: client_1.TransactionStatus.COMPLETED, pointsAwarded: pointsToAward_1 },
+                                            where: { id: id },
+                                            data: { status: client_1.TransactionStatus.COMPLETED, pointsAwarded: 10 },
                                         })];
                                 case 2:
                                     updatedTransaction = _a.sent();
-                                    // 4. Update WastePost status to SOLD
                                     return [4 /*yield*/, tx.wastePost.update({
                                             where: { id: transaction.wastePostId },
                                             data: { status: client_1.WastePostStatus.SOLD },
                                         })];
                                 case 3:
-                                    // 4. Update WastePost status to SOLD
                                     _a.sent();
                                     return [4 /*yield*/, tx.user.update({
-                                            where: { id: farmer.id },
-                                            data: { points: { increment: pointsToAward_1 } },
+                                            where: { id: transaction.wastePost.postedById },
+                                            data: { points: { increment: 10 } },
                                         })];
                                 case 4:
-                                    updatedFarmer = _a.sent();
+                                    _a.sent();
                                     return [4 /*yield*/, tx.pointLog.create({
                                             data: {
-                                                userId: farmer.id,
-                                                points: pointsToAward_1,
-                                                description: "+".concat(pointsToAward_1, " points from transaction ").concat(transaction.id),
+                                                userId: transaction.wastePost.postedById,
+                                                points: 10,
+                                                description: "Poin dari transaksi ".concat(transaction.id),
                                             },
                                         })];
                                 case 5:
-                                    pointLog = _a.sent();
-                                    return [2 /*return*/, { updatedTransaction: updatedTransaction, updatedFarmer: updatedFarmer, pointLog: pointLog }];
+                                    _a.sent();
+                                    return [2 /*return*/, updatedTransaction];
                             }
                         });
                     }); })];
             case 2:
                 result = _a.sent();
-                res.status(200).json({ message: 'Transaction completed successfully.', data: result });
+                res.status(200).json({ message: 'Transaksi Selesai!', data: result });
                 return [3 /*break*/, 4];
             case 3:
                 error_2 = _a.sent();
-                console.error('Transaction completion failed:', error_2);
-                res.status(400).json({ message: error_2.message || 'Could not complete transaction.' });
+                res.status(400).json({ message: error_2.message || 'Gagal menyelesaikan transaksi.' });
                 return [3 /*break*/, 4];
             case 4: return [2 /*return*/];
         }

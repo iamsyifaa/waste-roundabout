@@ -1,85 +1,68 @@
 import { Request, Response } from 'express';
 import { PrismaClient, Role, WastePostStatus } from '@prisma/client';
-import { wasteSchema } from '../utils/zod.schema';
 
 const prisma = new PrismaClient();
 
-// Corrected the role to FARMER as per your schema
-const FARMER_ROLE = Role.FARMER;
-
 export const createWaste = async (req: Request, res: Response) => {
+  if (!req.user || req.user.role !== Role.FARMER) {
+    return res.status(403).json({ message: 'Hanya Farmer yang bisa posting limbah.' });
+  }
+
+  const { title, description, weight, categoryId, imageUrl } = req.body;
+
+  if (weight <= 0) {
+    return res.status(400).json({ message: 'Berat limbah harus lebih dari 0 kg.' });
+  }
+
   try {
-    if (!req.user) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
-
-    if (req.user.role !== FARMER_ROLE) {
-      return res
-        .status(403)
-        .json({ message: `Forbidden: Only ${FARMER_ROLE}s can create waste entries.` });
-    }
-
-    const validation = wasteSchema.safeParse(req.body);
-    if (!validation.success) {
-      return res.status(400).json({ errors: validation.error.format() });
-    }
-
-    const { title, description, weight, categoryId, imageUrl } = validation.data;
-
-    const wastePost = await prisma.wastePost.create({
+    const newPost = await prisma.wastePost.create({
       data: {
         title,
         description,
         weight,
         imageUrl,
-        postedBy: {
-          connect: { id: req.user.id },
-        },
-        category: {
-          connect: { id: categoryId },
-        },
-        // The status defaults to AVAILABLE from the schema
+        categoryId,
+        postedById: req.user.id,
+        status: WastePostStatus.AVAILABLE,
       },
     });
-
-    res.status(201).json(wastePost);
+    res.status(201).json(newPost);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Gagal membuat postingan limbah.' });
   }
 };
 
-export const getAllWastes = async (_req: Request, res: Response) => {
+export const getAllWastes = async (req: Request, res: Response) => {
+  const { categoryId, lat, long } = req.query;
+
+  const where: any = {
+    status: WastePostStatus.AVAILABLE,
+  };
+
+  if (categoryId) {
+    where.categoryId = categoryId as string;
+  }
+
+  // Note: Proximity filtering with lat/long requires a more advanced setup
+  // with geospatial database features (e.g., PostGIS) and raw SQL queries.
+  // This is a basic implementation for filtering by categoryId.
+
   try {
     const wastes = await prisma.wastePost.findMany({
-      // Corrected the where clause to use the status enum
-      where: { status: WastePostStatus.AVAILABLE },
-      include: {
-        category: true,
-        // Corrected the relation name from 'farmer' to 'postedBy'
-        postedBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-          },
-        },
-      },
+      where,
+      include: { category: true, postedBy: { select: { name: true, email: true } } },
     });
     res.status(200).json(wastes);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Gagal mengambil data.' });
   }
 };
 
-export const getCategories = async (_req: Request, res: Response) => {
+export const getCategories = async (req: Request, res: Response) => {
   try {
     const categories = await prisma.wasteCategory.findMany();
     res.status(200).json(categories);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Gagal mengambil kategori.' });
   }
 };

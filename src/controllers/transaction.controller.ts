@@ -3,50 +3,42 @@ import { PrismaClient, Role, WastePostStatus, TransactionStatus } from '@prisma/
 
 const prisma = new PrismaClient();
 
-// Only COLLECTORs can initiate transactions
 export const createTransaction = async (req: Request, res: Response) => {
   if (!req.user || req.user.role !== Role.COLLECTOR) {
-    return res.status(403).json({ message: 'Forbidden: Only collectors can create transactions.' });
+    return res.status(403).json({ message: 'Forbidden: Hanya Collector yang bisa membeli.' });
   }
 
-  const { wastePostId } = req.body;
-  if (!wastePostId) {
-    return res.status(400).json({ message: 'wastePostId is required' });
-  }
+  const { waste_post_id } = req.body;
 
   try {
     const transactionResult = await prisma.$transaction(async (tx) => {
-      // 1. Fetch the WastePost and its category, and lock the row for update
       const wastePost = await tx.wastePost.findUnique({
-        where: { id: wastePostId },
+        where: { id: waste_post_id },
         include: { category: true },
       });
 
-      // 2. Check if the waste is available for transaction
-      if (!wastePost) {
-        throw new Error('Waste post not found.');
-      }
-      if (wastePost.status !== WastePostStatus.AVAILABLE) {
-        throw new Error(`Waste is already ${wastePost.status}.`);
+      if (!wastePost) throw new Error('Postingan limbah tidak ditemukan.');
+      if (wastePost.status !== WastePostStatus.AVAILABLE) throw new Error('Limbah sudah tidak tersedia.');
+      
+      // VALIDASI: Farmer dilarang beli limbahnya sendiri
+      if (wastePost.postedById === req.user?.id) {
+        throw new Error('Anda tidak bisa membeli limbah Anda sendiri.');
       }
 
-      // 3. Calculate final price
       const finalPrice = wastePost.weight * wastePost.category.basePricePerKg;
 
-      // 4. Create the transaction record
       const newTransaction = await tx.transaction.create({
         data: {
-          collectorId: req.user.id,
-          wastePostId: wastePostId,
-          pointsAwarded: 0, // Points are awarded upon completion
+          collectorId: req.user!.id,
+          wastePostId: waste_post_id,
+          pointsAwarded: 0,
           finalPrice: finalPrice,
           status: TransactionStatus.PENDING,
         },
       });
 
-      // 5. Update the waste post status to BOOKED
       await tx.wastePost.update({
-        where: { id: wastePostId },
+        where: { id: waste_post_id },
         data: { status: WastePostStatus.BOOKED },
       });
 
@@ -55,71 +47,55 @@ export const createTransaction = async (req: Request, res: Response) => {
 
     res.status(201).json(transactionResult);
   } catch (error: any) {
-    console.error('Transaction failed:', error);
-    res.status(400).json({ message: error.message || 'Could not create transaction.' });
+    res.status(400).json({ message: error.message || 'Gagal membuat transaksi.' });
   }
 };
 
-// COLLECTORs or ADMINs can complete transactions
 export const completeTransaction = async (req: Request, res: Response) => {
-  if (!req.user || (req.user.role !== Role.COLLECTOR && req.user.role !== Role.ADMIN)) {
-    return res.status(403).json({ message: 'Forbidden: Only collectors or admins can complete transactions.' });
-  }
-
-  const { id: transactionId } = req.params;
+  const { id } = req.params;
 
   try {
-    const pointsToAward = 10;
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Find the transaction and the associated farmer
       const transaction = await tx.transaction.findUnique({
-        where: { id: transactionId },
-        include: { wastePost: { include: { postedBy: true } } },
+        where: { id },
+        include: { wastePost: true },
       });
 
-      // 2. Validate the transaction
-      if (!transaction) {
-        throw new Error('Transaction not found.');
-      }
+      if (!transaction) throw new Error('Transaksi tidak ditemukan.');
+      
+      // VALIDASI: Hanya bisa selesaikan jika status masih PENDING
       if (transaction.status !== TransactionStatus.PENDING) {
-        throw new Error(`Transaction is already ${transaction.status}.`);
+        throw new Error('Transaksi ini sudah selesai atau dibatalkan.');
       }
 
-      const farmer = transaction.wastePost.postedBy;
-
-      // 3. Update Transaction status to COMPLETED
       const updatedTransaction = await tx.transaction.update({
-        where: { id: transactionId },
-        data: { status: TransactionStatus.COMPLETED, pointsAwarded: pointsToAward },
+        where: { id },
+        data: { status: TransactionStatus.COMPLETED, pointsAwarded: 10 },
       });
 
-      // 4. Update WastePost status to SOLD
       await tx.wastePost.update({
         where: { id: transaction.wastePostId },
         data: { status: WastePostStatus.SOLD },
       });
 
-      // 5. Award points to the farmer
-      const updatedFarmer = await tx.user.update({
-        where: { id: farmer.id },
-        data: { points: { increment: pointsToAward } },
+      await tx.user.update({
+        where: { id: transaction.wastePost.postedById },
+        data: { points: { increment: 10 } },
       });
 
-      // 6. Create a PointLog entry for audit
-      const pointLog = await tx.pointLog.create({
+      await tx.pointLog.create({
         data: {
-          userId: farmer.id,
-          points: pointsToAward,
-          description: `+${pointsToAward} points from transaction ${transaction.id}`,
+          userId: transaction.wastePost.postedById,
+          points: 10,
+          description: `Poin dari transaksi ${transaction.id}`,
         },
       });
 
-      return { updatedTransaction, updatedFarmer, pointLog };
+      return updatedTransaction;
     });
 
-    res.status(200).json({ message: 'Transaction completed successfully.', data: result });
+    res.status(200).json({ message: 'Transaksi Selesai!', data: result });
   } catch (error: any) {
-    console.error('Transaction completion failed:', error);
-    res.status(400).json({ message: error.message || 'Could not complete transaction.' });
+    res.status(400).json({ message: error.message || 'Gagal menyelesaikan transaksi.' });
   }
 };
