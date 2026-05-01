@@ -23,6 +23,19 @@ export const getProfile = async (userId: string) => {
           pointLogs: true,
         },
       },
+      badges: {
+        select: {
+          badge: {
+            select: {
+              code: true,
+              name: true,
+              icon: true,
+              description: true,
+            }
+          },
+          createdAt: true,
+        }
+      }
     },
   });
 
@@ -48,6 +61,16 @@ export const getLeaderboard = async (limit: number = 10) => {
           wastePosts: true,
         },
       },
+      badges: {
+        select: {
+          badge: {
+            select: {
+              code: true,
+              icon: true,
+            }
+          }
+        }
+      }
     },
     orderBy: { points: 'desc' },
     take: limit,

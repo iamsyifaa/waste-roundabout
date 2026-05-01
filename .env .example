@@ -1,3 +1,11 @@
-DATABASE_URL="postgresql://neondb_owner:npg_5YZRNPa6AxXl@ep-steep-moon-aoiruoye-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-JWT_SECRET="sampah_jadi_cuan"
+DATABASE_URL="postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require"
+JWT_SECRET="padi_super_aman_sekali_123"
 PORT=3000
+FRONTEND_URL="http://localhost:5173"
+
+# Midtrans API Keys (Wajib untuk fitur pembayaran)
+MIDTRANS_SERVER_KEY="Mid-server-placeholder"
+MIDTRANS_CLIENT_KEY="Mid-client-placeholder"
+
+# Gemini AI API Key (Wajib untuk fitur klasifikasi limbah)
+GEMINI_API_KEY="your_gemini_api_key_here"

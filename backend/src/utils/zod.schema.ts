@@ -47,6 +47,7 @@ export const paginationSchema = z.object({
   search: z.string().optional(),
   sort: z.enum(['newest', 'oldest', 'price_asc', 'price_desc', 'weight_asc', 'weight_desc']).default('newest'),
   categoryId: z.string().uuid().optional(),
+  farmerId: z.string().uuid().optional(),
 });
 
 // --- AI Schema ---

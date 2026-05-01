@@ -36,14 +36,18 @@ export const createWastePost = async (userId: string, userRole: string, data: un
  * Gets all waste posts with pagination, search, sort, and filter.
  */
 export const getAllWastePosts = async (query: unknown) => {
-  const { page, limit, search, sort, categoryId } = paginationSchema.parse(query);
+  const { page, limit, search, sort, categoryId, farmerId } = paginationSchema.parse(query);
 
   const skip = (page - 1) * limit;
 
   // Build where clause
-  const where: any = {
-    status: WastePostStatus.AVAILABLE,
-  };
+  const where: any = {};
+
+  if (farmerId) {
+    where.postedById = farmerId;
+  } else {
+    where.status = WastePostStatus.AVAILABLE;
+  }
 
   if (categoryId) {
     where.categoryId = categoryId;
