@@ -1,0 +1,86 @@
+@baseUrl = http://localhost:3000/api/v1
+
+### ==========================================
+### AKT 1: SANG PETANI (FARMER)
+### ==========================================
+
+### 1. Register Farmer
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Pak Tani",
+  "email": "tani@mail.com",
+  "password": "123",
+  "role": "FARMER"
+}
+
+### 2. Login Farmer (AMBIL TOKENNYA!)
+# @name loginFarmer
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "tani@mail.com",
+  "password": "123"
+}
+
+### 3. Farmer Posting Limbah
+# Ganti <TOKEN_FARMER> dengan token panjang dari hasil login di atas.
+# Ganti <ID_KATEGORI> dengan ID dari Prisma Studio (Tabel WasteCategory).
+POST {{baseUrl}}/waste
+Content-Type: application/json
+Authorization: Bearer <TOKEN_FARMER>
+
+{
+  "title": "Sekam Padi Kering",
+  "weight": 50,
+  "categoryId": "<ID_KATEGORI>"
+}
+
+
+### ==========================================
+### AKT 2: SANG PENGEPUL (COLLECTOR)
+### ==========================================
+
+### 4. Register Collector
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Bang Pengepul",
+  "email": "pengepul@mail.com",
+  "password": "123",
+  "role": "COLLECTOR"
+}
+
+### 5. Login Collector (AMBIL TOKENNYA!)
+# @name loginCollector
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "pengepul@mail.com",
+  "password": "123"
+}
+
+### ==========================================
+### AKT 3: TRANSAKSI JUAL BELI
+### ==========================================
+
+### 6. Collector Beli Limbah
+# Ganti <TOKEN_COLLECTOR> dengan token dari step 5.
+# Ganti <ID_POSTINGAN_LIMBAH> dengan ID waste post dari step 3.
+POST {{baseUrl}}/transactions
+Content-Type: application/json
+Authorization: Bearer <TOKEN_COLLECTOR>
+
+{
+  "waste_post_id": "<ID_POSTINGAN_LIMBAH>"
+}
+
+### 7. Collector Selesaikan Transaksi (Dapet Poin!)
+# Ganti <TOKEN_COLLECTOR> dengan token dari step 5.
+# Ganti <ID_TRANSAKSI> dengan ID transaksi dari step 6.
+PATCH {{baseUrl}}/transactions/<ID_TRANSAKSI>/complete
+Authorization: Bearer <TOKEN_COLLECTOR>
