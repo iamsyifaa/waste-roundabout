@@ -1,3 +1,3 @@
-DATABASE_URL="postgresql://neondb_owner:npg_5YZRNPa6AxXl@ep-steep-moon-aoiruoye.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
-JWT_SECRET="padi_super_aman_sekali_123"
+DATABASE_URL="postgresql://neondb_owner:npg_5YZRNPa6AxXl@ep-steep-moon-aoiruoye-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+JWT_SECRET="sampah_jadi_cuan"
 PORT=3000

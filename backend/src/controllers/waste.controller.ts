@@ -1,20 +1,16 @@
 import { Request, Response } from 'express';
-import { PrismaClient, Role, WastePostStatus } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { Role, WastePostStatus } from '@prisma/client';
+import { prisma } from '../utils/prisma';
+import { wasteSchema } from '../utils/zod.schema';
 
 export const createWaste = async (req: Request, res: Response) => {
   if (!req.user || req.user.role !== Role.FARMER) {
     return res.status(403).json({ message: 'Hanya Farmer yang bisa posting limbah.' });
   }
 
-  const { title, description, weight, categoryId, imageUrl } = req.body;
-
-  if (weight <= 0) {
-    return res.status(400).json({ message: 'Berat limbah harus lebih dari 0 kg.' });
-  }
-
   try {
+    const { title, description, weight, categoryId, imageUrl } = wasteSchema.parse(req.body);
+
     const newPost = await prisma.wastePost.create({
       data: {
         title,
@@ -28,7 +24,7 @@ export const createWaste = async (req: Request, res: Response) => {
     });
     res.status(201).json(newPost);
   } catch (error) {
-    res.status(500).json({ message: 'Gagal membuat postingan limbah.' });
+    res.status(400).json({ message: 'Invalid data atau gagal membuat postingan limbah.', error });
   }
 };
 

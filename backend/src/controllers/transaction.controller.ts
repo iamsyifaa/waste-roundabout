@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
-import { PrismaClient, Role, WastePostStatus, TransactionStatus } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { Role, WastePostStatus, TransactionStatus } from '@prisma/client';
+import { prisma } from '../utils/prisma';
 
 export const createTransaction = async (req: Request, res: Response) => {
   if (!req.user || req.user.role !== Role.COLLECTOR) {
@@ -62,6 +61,11 @@ export const completeTransaction = async (req: Request, res: Response) => {
       });
 
       if (!transaction) throw new Error('Transaksi tidak ditemukan.');
+      
+      // VALIDASI: Authorization check
+      if (req.user?.id !== transaction.collectorId && req.user?.id !== transaction.wastePost.postedById) {
+        throw new Error('Forbidden: Anda tidak memiliki akses untuk menyelesaikan transaksi ini.');
+      }
       
       // VALIDASI: Hanya bisa selesaikan jika status masih PENDING
       if (transaction.status !== TransactionStatus.PENDING) {
