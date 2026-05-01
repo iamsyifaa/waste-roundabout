@@ -10,8 +10,8 @@ Content-Type: application/json
 
 {
   "name": "Pak Tani",
-  "email": "tani@mail.com",
-  "password": "123",
+  "email": "tani2@mail.com",
+  "password": "password123",
   "role": "FARMER"
 }
 
@@ -21,56 +21,70 @@ POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "email": "tani@mail.com",
-  "password": "123"
+  "email": "tani2@mail.com",
+  "password": "password123"
 }
 
-### 3. Farmer Posting Limbah
-# Ganti <TOKEN_FARMER> dengan token panjang dari hasil login di atas.
-# Ganti <ID_KATEGORI> dengan ID dari Prisma Studio (Tabel WasteCategory).
+### 3. Cek Profil Farmer
+# Ganti <TOKEN_FARMER> dengan token dari step 2
+GET {{baseUrl}}/users/me
+Authorization: Bearer <TOKEN_FARMER>
+
+### 4. Farmer Cek AI Rekomendasi (Gemini)
+# Ganti <TOKEN_FARMER> dengan token dari step 2
+POST {{baseUrl}}/ai/classify
+Content-Type: application/json
+Authorization: Bearer <TOKEN_FARMER>
+
+{
+  "description": "Limbah kulit kopi kering hasil panen robusta sebanyak 100kg, masih bersih dan belum kena hujan."
+}
+
+### 5. Farmer Posting Limbah
+# Ganti <TOKEN_FARMER> dengan token dari step 2
+# Ganti <ID_KATEGORI> dengan ID kategori "Kulit Kopi" dari GET /waste/categories
 POST {{baseUrl}}/waste
 Content-Type: application/json
 Authorization: Bearer <TOKEN_FARMER>
 
 {
-  "title": "Sekam Padi Kering",
-  "weight": 50,
+  "title": "Kulit Kopi Kering Kualitas A",
+  "description": "Sisa panen robusta minggu ini.",
+  "weight": 100,
   "categoryId": "<ID_KATEGORI>"
 }
-
 
 ### ==========================================
 ### AKT 2: SANG PENGEPUL (COLLECTOR)
 ### ==========================================
 
-### 4. Register Collector
+### 6. Register Collector
 POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
   "name": "Bang Pengepul",
-  "email": "pengepul@mail.com",
-  "password": "123",
+  "email": "pengepul2@mail.com",
+  "password": "password123",
   "role": "COLLECTOR"
 }
 
-### 5. Login Collector (AMBIL TOKENNYA!)
+### 7. Login Collector (AMBIL TOKENNYA!)
 # @name loginCollector
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "email": "pengepul@mail.com",
-  "password": "123"
+  "email": "pengepul2@mail.com",
+  "password": "password123"
 }
 
-### ==========================================
-### AKT 3: TRANSAKSI JUAL BELI
-### ==========================================
+### 8. Collector Lihat Daftar Limbah
+GET {{baseUrl}}/waste?page=1&limit=10&sort=newest
 
-### 6. Collector Beli Limbah
-# Ganti <TOKEN_COLLECTOR> dengan token dari step 5.
-# Ganti <ID_POSTINGAN_LIMBAH> dengan ID waste post dari step 3.
+### 9. Collector Beli Limbah
+# Ganti <TOKEN_COLLECTOR> dengan token dari step 7.
+# Ganti <ID_POSTINGAN_LIMBAH> dengan ID waste post dari step 5.
 POST {{baseUrl}}/transactions
 Content-Type: application/json
 Authorization: Bearer <TOKEN_COLLECTOR>
@@ -79,8 +93,39 @@ Authorization: Bearer <TOKEN_COLLECTOR>
   "waste_post_id": "<ID_POSTINGAN_LIMBAH>"
 }
 
-### 7. Collector Selesaikan Transaksi (Dapet Poin!)
-# Ganti <TOKEN_COLLECTOR> dengan token dari step 5.
-# Ganti <ID_TRANSAKSI> dengan ID transaksi dari step 6.
+### ==========================================
+### AKT 3: PEMBAYARAN MIDTRANS
+### ==========================================
+
+### 10. Collector Initiate Payment
+# Ganti <TOKEN_COLLECTOR> dengan token dari step 7.
+# Ganti <ID_TRANSAKSI> dengan ID transaksi dari step 9.
+POST {{baseUrl}}/payments/<ID_TRANSAKSI>/pay
+Authorization: Bearer <TOKEN_COLLECTOR>
+
+### 11. Simulasi Webhook dari Midtrans (Sistem ke Sistem)
+# Ganti <MIDTRANS_ORDER_ID> dengan midtransOrderId dari hasil response API step 10.
+POST {{baseUrl}}/payments/notification
+Content-Type: application/json
+
+{
+  "order_id": "<MIDTRANS_ORDER_ID>",
+  "transaction_status": "settlement",
+  "fraud_status": "accept"
+}
+
+### ==========================================
+### AKT 4: SELESAI & LEADERBOARD
+### ==========================================
+
+### 12. Selesaikan Transaksi
+# Ganti <TOKEN_COLLECTOR> dengan token dari step 7 (atau Farmer juga bisa).
+# Ganti <ID_TRANSAKSI> dengan ID transaksi dari step 9.
 PATCH {{baseUrl}}/transactions/<ID_TRANSAKSI>/complete
 Authorization: Bearer <TOKEN_COLLECTOR>
+
+### 13. Lihat Leaderboard Top Farmer
+GET {{baseUrl}}/users/leaderboard
+
+### 14. Lihat Dashboard Stats
+GET {{baseUrl}}/users/stats

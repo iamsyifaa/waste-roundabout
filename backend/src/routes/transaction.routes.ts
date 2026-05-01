@@ -1,5 +1,11 @@
 import { Router } from 'express';
-import { createTransaction, completeTransaction } from '../controllers/transaction.controller';
+import {
+  createTransaction,
+  completeTransaction,
+  cancelTransaction,
+  getMyTransactions,
+  getTransactionById,
+} from '../controllers/transaction.controller';
 import { protect } from '../middlewares/auth.middleware';
 
 const router = Router();
@@ -7,10 +13,19 @@ const router = Router();
 // All transaction routes are protected
 router.use(protect);
 
-// Route for a buyer (collector) to create a transaction
+// List my transactions
+router.get('/me', getMyTransactions);
+
+// Get single transaction
+router.get('/:id', getTransactionById);
+
+// Create a transaction (COLLECTOR buys waste)
 router.post('/', createTransaction);
 
-// Route for a buyer (collector) or admin to mark a transaction as complete
+// Complete a transaction
 router.patch('/:id/complete', completeTransaction);
+
+// Cancel a transaction
+router.patch('/:id/cancel', cancelTransaction);
 
 export default router;

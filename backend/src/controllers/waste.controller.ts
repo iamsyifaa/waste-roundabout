@@ -1,64 +1,57 @@
 import { Request, Response } from 'express';
-import { Role, WastePostStatus } from '@prisma/client';
-import { prisma } from '../utils/prisma';
-import { wasteSchema } from '../utils/zod.schema';
+import { asyncHandler } from '../utils/asyncHandler';
+import * as wasteService from '../services/waste.service';
 
-export const createWaste = async (req: Request, res: Response) => {
-  if (!req.user || req.user.role !== Role.FARMER) {
-    return res.status(403).json({ message: 'Hanya Farmer yang bisa posting limbah.' });
-  }
+/**
+ * POST /api/v1/waste
+ * Creates a new waste post (FARMER only).
+ */
+export const createWaste = asyncHandler(async (req: Request, res: Response) => {
+  const post = await wasteService.createWastePost(req.user!.id, req.user!.role, req.body);
+  res.status(201).json({ success: true, data: post });
+});
 
-  try {
-    const { title, description, weight, categoryId, imageUrl } = wasteSchema.parse(req.body);
+/**
+ * GET /api/v1/waste
+ * Lists all available waste posts with pagination, search, sort, and filter.
+ */
+export const getAllWastes = asyncHandler(async (req: Request, res: Response) => {
+  const result = await wasteService.getAllWastePosts(req.query);
+  res.json({ success: true, ...result });
+});
 
-    const newPost = await prisma.wastePost.create({
-      data: {
-        title,
-        description,
-        weight,
-        imageUrl,
-        categoryId,
-        postedById: req.user.id,
-        status: WastePostStatus.AVAILABLE,
-      },
-    });
-    res.status(201).json(newPost);
-  } catch (error) {
-    res.status(400).json({ message: 'Invalid data atau gagal membuat postingan limbah.', error });
-  }
-};
+/**
+ * GET /api/v1/waste/categories
+ * Lists all waste categories.
+ */
+export const getCategories = asyncHandler(async (_req: Request, res: Response) => {
+  const categories = await wasteService.getCategories();
+  res.json({ success: true, data: categories });
+});
 
-export const getAllWastes = async (req: Request, res: Response) => {
-  const { categoryId, lat, long } = req.query;
+/**
+ * GET /api/v1/waste/:id
+ * Gets a single waste post by ID.
+ */
+export const getWasteById = asyncHandler(async (req: Request, res: Response) => {
+  const post = await wasteService.getWastePostById(req.params.id);
+  res.json({ success: true, data: post });
+});
 
-  const where: any = {
-    status: WastePostStatus.AVAILABLE,
-  };
+/**
+ * PUT /api/v1/waste/:id
+ * Updates a waste post (FARMER only, own post, AVAILABLE only).
+ */
+export const updateWaste = asyncHandler(async (req: Request, res: Response) => {
+  const post = await wasteService.updateWastePost(req.user!.id, req.params.id, req.body);
+  res.json({ success: true, data: post });
+});
 
-  if (categoryId) {
-    where.categoryId = categoryId as string;
-  }
-
-  // Note: Proximity filtering with lat/long requires a more advanced setup
-  // with geospatial database features (e.g., PostGIS) and raw SQL queries.
-  // This is a basic implementation for filtering by categoryId.
-
-  try {
-    const wastes = await prisma.wastePost.findMany({
-      where,
-      include: { category: true, postedBy: { select: { name: true, email: true } } },
-    });
-    res.status(200).json(wastes);
-  } catch (error) {
-    res.status(500).json({ message: 'Gagal mengambil data.' });
-  }
-};
-
-export const getCategories = async (req: Request, res: Response) => {
-  try {
-    const categories = await prisma.wasteCategory.findMany();
-    res.status(200).json(categories);
-  } catch (error) {
-    res.status(500).json({ message: 'Gagal mengambil kategori.' });
-  }
-};
+/**
+ * DELETE /api/v1/waste/:id
+ * Deletes a waste post (FARMER only, own post, AVAILABLE only).
+ */
+export const deleteWaste = asyncHandler(async (req: Request, res: Response) => {
+  const result = await wasteService.deleteWastePost(req.user!.id, req.params.id);
+  res.json({ success: true, ...result });
+});

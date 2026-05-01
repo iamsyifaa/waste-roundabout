@@ -26,6 +26,15 @@ enum WastePostStatus {
 enum TransactionStatus {
   PENDING
   COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
 }
 
 // --- MODELS ---
@@ -36,19 +45,20 @@ model User {
   name         String?
   password     String
   role         Role          @default(FARMER)
-  points       Int           @default(0) // Pastikan namanya 'points' bukan 'total_points'
+  points       Int           @default(0)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   wastePosts   WastePost[]
   transactions Transaction[]
   pointLogs    PointLog[]
+  badges       UserBadge[]
 }
 
 model WasteCategory {
   id             String      @id @default(uuid())
   name           String      @unique
   description    String?
-  basePricePerKg Float       @default(0.0) // Gunakan camelCase agar sinkron dengan Controller
+  basePricePerKg Float       @default(0.0)
   wastePosts     WastePost[]
 }
 
@@ -69,15 +79,18 @@ model WastePost {
 }
 
 model Transaction {
-  id            String            @id @default(uuid())
-  wastePostId   String            @unique
-  wastePost     WastePost         @relation(fields: [wastePostId], references: [id])
-  collectorId   String
-  collector     User              @relation(fields: [collectorId], references: [id])
-  pointsAwarded Int
-  finalPrice    Float             @default(0.0)
-  status        TransactionStatus @default(PENDING)
-  createdAt     DateTime          @default(now())
+  id              String            @id @default(uuid())
+  wastePostId     String            @unique
+  wastePost       WastePost         @relation(fields: [wastePostId], references: [id])
+  collectorId     String
+  collector       User              @relation(fields: [collectorId], references: [id])
+  pointsAwarded   Int
+  finalPrice      Float             @default(0.0)
+  status          TransactionStatus @default(PENDING)
+  paymentStatus   PaymentStatus     @default(UNPAID)
+  snapToken       String?
+  midtransOrderId String?           @unique
+  createdAt       DateTime          @default(now())
 }
 
 model PointLog {
@@ -87,4 +100,24 @@ model PointLog {
   points      Int
   description String
   createdAt   DateTime @default(now())
+}
+
+model Badge {
+  id          String      @id @default(uuid())
+  code        String      @unique
+  name        String
+  description String
+  icon        String      @default("🏆")
+  users       UserBadge[]
+}
+
+model UserBadge {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  badgeId   String
+  badge     Badge    @relation(fields: [badgeId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, badgeId])
 }
