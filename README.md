@@ -1,10 +1,10 @@
-# ♻️ Waste-Roundabout Backend API
+# ♻️ Waste-Roundabout Backend API (Agri-Cycle)
 
-REST API untuk platform **Agri-Cycle** — marketplace limbah pertanian yang menghubungkan Petani (Farmer) dengan Pengepul (Collector). Petani posting limbah, Pengepul membeli, dan Petani mendapat poin reward.
+REST API untuk platform **Agri-Cycle** — marketplace limbah pertanian yang menghubungkan Petani (Farmer) dengan Pengepul (Collector). Petani memposting limbah, Pengepul membeli secara online via **Midtrans**, dan Petani mendapatkan poin reward serta **Badge Gamifikasi**.
 
 ## 🛠 Tech Stack
 
-Node.js · TypeScript · Express.js · Prisma ORM · PostgreSQL (Neon) · JWT · bcrypt · Zod · Helmet
+Node.js · TypeScript · Express.js · Prisma ORM · PostgreSQL (Neon) · JWT · bcrypt · Zod · Helmet · Midtrans SDK · Google Generative AI (Gemini) · Jest & Supertest
 
 ---
 
@@ -22,9 +22,9 @@ npm install
 # Buat file .env di folder backend/ (lihat contoh di bawah)
 
 # 4. Jalankan migrasi database
-npx prisma migrate dev
+npx prisma db push
 
-# 5. (Opsional) Seed data kategori limbah
+# 5. Seed data kategori limbah & badge
 npx prisma db seed
 
 # 6. Jalankan server
@@ -35,13 +35,20 @@ Server berjalan di `http://localhost:3000`
 
 ### Environment Variables
 
-Buat file `.env`:
+Buat file `.env` di folder `backend/`:
 
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require"
 JWT_SECRET="ganti_dengan_secret_yang_kuat"
 PORT=3000
 FRONTEND_URL="http://localhost:5173"
+
+# Midtrans API Keys (Wajib untuk fitur pembayaran)
+MIDTRANS_SERVER_KEY="Mid-server-..."
+MIDTRANS_CLIENT_KEY="Mid-client-..."
+
+# Gemini AI API Key (Wajib untuk fitur klasifikasi limbah)
+GEMINI_API_KEY="your_gemini_api_key_here"
 ```
 
 ---
@@ -50,12 +57,14 @@ FRONTEND_URL="http://localhost:5173"
 
 ```
 backend/src/
-├── controllers/         # Request handler (auth, waste, transaction)
-├── middlewares/          # JWT auth middleware
+├── controllers/         # Request handler
+├── middlewares/         # Middleware (Auth, Error Handler, Security)
 ├── routes/              # Route definitions (/api/v1/*)
-├── utils/               # Prisma singleton & Zod schemas
-├── app.ts               # Express config & middleware
-└── index.ts             # Entry point
+├── services/            # Core business logic (SOA Pattern)
+├── tests/               # Unit & Integration Tests (Jest)
+├── utils/               # Helper (Prisma, Zod, Midtrans, Gemini)
+├── app.ts               # Express config & middleware setup
+└── index.ts             # Entry point server
 ```
 
 ---
@@ -67,127 +76,110 @@ backend/src/
 | Model | Deskripsi |
 | :--- | :--- |
 | **User** | Pengguna (role: FARMER / COLLECTOR / ADMIN) dengan sistem poin |
-| **WasteCategory** | Kategori limbah (Sekam Padi, Kulit Kopi, Jerami, dll) |
-| **WastePost** | Postingan limbah oleh Farmer (status: AVAILABLE → BOOKED → SOLD) |
-| **Transaction** | Transaksi jual-beli antara Farmer & Collector |
-| **PointLog** | Log riwayat poin yang diterima Farmer |
+| **WasteCategory** | Kategori limbah beserta `basePricePerKg` |
+| **WastePost** | Postingan limbah (status: AVAILABLE → BOOKED → SOLD) |
+| **Transaction** | Transaksi jual-beli (Terintegrasi dengan Midtrans PaymentStatus) |
+| **PointLog** | Riwayat penambahan poin Farmer |
+| **Badge & UserBadge** | Sistem Achievement/Medali untuk Gamifikasi |
 
 ### Useful Commands
 
 ```bash
 npx prisma studio        # Buka GUI database
-npx prisma migrate dev   # Jalankan migrasi
-npx prisma db seed       # Seed data awal
+npx prisma db push       # Sync skema tanpa migrasi file
+npx prisma db seed       # Seed data awal (Kategori & Badge)
+npm run test             # Jalankan test suite
 ```
 
 ---
 
-## 📡 API Endpoints
+## 📡 API Endpoints Utama
 
 Base URL: `http://localhost:3000/api/v1`
 
-### Authentication
-
+### Authentication & Users
 | Method | Endpoint | Auth | Deskripsi |
 | :--- | :--- | :---: | :--- |
-| `POST` | `/auth/register` | Tidak | Registrasi (role: `FARMER` / `COLLECTOR`) |
-| `POST` | `/auth/login` | Tidak | Login, return JWT token (berlaku 1 jam) |
+| `POST` | `/auth/register` | Tidak | Registrasi (`FARMER` / `COLLECTOR`) |
+| `POST` | `/auth/login` | Tidak | Login & dapatkan JWT token |
+| `GET`  | `/users/me` | Ya | Lihat profil, poin, dan badge |
+| `GET`  | `/users/leaderboard` | Tidak | Top Farmer berdasarkan poin terbanyak |
 
-### Waste Posts
+### Gemini AI
+| Method | Endpoint | Auth | Deskripsi |
+| :--- | :--- | :---: | :--- |
+| `POST` | `/ai/classify` | Ya (FARMER) | Analisis deskripsi limbah & rekomendasi |
 
+### Waste & Transactions
 | Method | Endpoint | Auth | Deskripsi |
 | :--- | :--- | :---: | :--- |
 | `POST` | `/waste` | Ya (FARMER) | Posting limbah baru |
-| `GET` | `/waste` | Tidak | List semua limbah yang tersedia |
-| `GET` | `/waste/categories` | Tidak | List semua kategori limbah |
+| `GET`  | `/waste` | Tidak | List semua limbah (Mendukung Pagination & Sorting) |
+| `POST` | `/transactions` | Ya (COLLECTOR)| Booking limbah yang tersedia |
+| `PATCH`| `/transactions/:id/complete`| Keduanya | Selesaikan transaksi (Memicu pembagian Poin & Badge) |
 
-### Transactions
-
+### Midtrans Payments
 | Method | Endpoint | Auth | Deskripsi |
 | :--- | :--- | :---: | :--- |
-| `POST` | `/transactions` | Ya (COLLECTOR) | Beli/book limbah |
-| `PATCH` | `/transactions/:id/complete` | Ya (COLLECTOR/FARMER terkait) | Selesaikan transaksi (+10 poin untuk Farmer) |
-
-### Health Check
-
-| Method | Endpoint | Deskripsi |
-| :--- | :--- | :--- |
-| `GET` | `/ping` | Return `pong` |
+| `POST` | `/payments/:transactionId/pay` | Ya (COLLECTOR)| Generate Snap Token pembayaran |
+| `POST` | `/payments/notification` | Tidak | Webhook callback dari Midtrans |
 
 ---
 
 ## 🎬 Alur Penggunaan
 
 ```
-1. Farmer register & login         → dapat JWT token
-2. Farmer posting limbah            → POST /waste
-3. Collector register & login       → dapat JWT token
-4. Collector lihat daftar limbah    → GET /waste
-5. Collector beli limbah            → POST /transactions
-6. Selesaikan transaksi             → PATCH /transactions/:id/complete
-7. Farmer mendapat +10 poin! 🎉
+1. Farmer cek deskripsi limbah via AI  → POST /ai/classify
+2. Farmer posting limbah               → POST /waste
+3. Collector booking limbah            → POST /transactions
+4. Collector melakukan pembayaran      → POST /payments/:id/pay (Muncul Popup Midtrans)
+5. Midtrans kirim notifikasi lunas     → POST /payments/notification
+6. Transaksi diselesaikan              → PATCH /transactions/:id/complete
+7. Farmer otomatis dapat Poin & Badge! 🎉
 ```
 
 ---
 
-## 💰 Fitur: Cuan Calculator
+## 🏆 Fitur: Advanced Gamification
 
-Harga jual limbah dihitung **otomatis** oleh sistem saat transaksi dibuat:
+Platform ini menggunakan sistem poin **dinamis** dan **Badge Achievement** untuk memotivasi Farmer:
 
-```
-finalPrice = berat limbah (kg) × harga dasar per kg (dari kategori)
-```
-
-Setiap kategori limbah punya `basePricePerKg` yang bisa diatur di database (tabel `WasteCategory`). Collector tidak perlu input harga manual — sistem yang menentukan harga fair berdasarkan berat dan jenis limbah.
-
----
-
-## 🏆 Fitur: Gamification (Sistem Poin)
-
-Platform ini menggunakan sistem **poin reward** untuk memotivasi Farmer menjual limbah:
-
-- Setiap transaksi yang berhasil diselesaikan (`COMPLETED`), Farmer otomatis mendapat **+10 poin**
-- Poin terakumulasi di field `points` pada profil User
-- Setiap penambahan poin dicatat di tabel `PointLog` sebagai riwayat
-
-```
-Transaksi selesai → Farmer +10 poin → Tercatat di PointLog
-```
+- **Poin Dinamis:** Poin dihitung otomatis berdasarkan berat limbah (contoh: 100kg limbah bisa menghasilkan poin jauh lebih besar dibanding 10kg, minimal poin adalah 10).
+- **Point Log:** Riwayat penambahan poin bisa dilacak secara transparan.
+- **Badge System:** Farmer bisa *unlock* medali spesial:
+  - `FIRST_SALE` 🥚: Sukses jualan pertama kali.
+  - `ECO_WARRIOR` 🦸‍♂️: Sukses jualan 10x.
+  - `CLUB_100KG` 💯: Menjual limbah akumulasi 100kg.
+- **Leaderboard:** Dashboard publik untuk melihat Top Farmer!
 
 ---
 
 ## 🔒 Keamanan
 
-- **Helmet** — HTTP security headers
-- **CORS** — Dibatasi ke `FRONTEND_URL`
-- **Zod** — Validasi semua input request
-- **bcrypt** — Password hashing (salt rounds: 10)
-- **JWT** — Token-based auth (expiry: 1 jam)
-- **Role Guard** — Endpoint dilindungi berdasarkan role
-- **Authorization** — Transaksi hanya bisa diselesaikan oleh pihak terkait
+- **Helmet** — Proteksi header HTTP
+- **Rate Limiting** — Mencegah *brute-force* pada endpoint login
+- **CORS** — Terkunci ke `FRONTEND_URL`
+- **Zod** — Validasi *strict* untuk semua input API
+- **bcrypt** — Hashing password
+- **Role Guard Middleware** — Hanya Collector yang bisa beli, dsb.
 
 ---
 
-## 📜 Scripts
+## 🧪 Testing (Jest + Supertest)
 
-| Script | Deskripsi |
-| :--- | :--- |
-| `npm run dev` | Server development (hot-reload) |
-| `npm run build` | Compile TypeScript |
-| `npm start` | Jalankan production build |
-| `npm run prisma:studio` | Buka Prisma Studio GUI |
-| `npm run prisma:migrate` | Jalankan migrasi database |
-
----
-
-## 🌐 Deployment (Vercel)
+Proyek ini telah dilengkapi dengan unit/integration tests untuk memastikan kelancaran alur sistem.
 
 ```bash
-npm i -g vercel
-vercel --prod
+# Menjalankan seluruh test suite
+npm run test
 ```
+*Tersedia juga file `testing.http` untuk diuji manual menggunakan ekstensi REST Client di VS Code.*
 
-Set environment variables di Vercel Dashboard: `DATABASE_URL`, `JWT_SECRET`, `FRONTEND_URL`.
+---
+
+## 🌐 Deployment
+
+Siap untuk di-deploy ke **Vercel** atau platform NodeJS lainnya (sudah disetup `vercel.json` dan compile script). Pastikan semua Environment Variable di-set di Dashboard Vercel.
 
 ---
 
