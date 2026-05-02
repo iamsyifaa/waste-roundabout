@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+/* 1. Import Font Poppins */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* 2. Setup Tema Visual Waste Roundabout */
+@theme {
+  --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  
+  /* Warna Identitas Project */
+  --color-navy: #001F3F;
+  --color-turmeric: #FFB800;
+  --color-soft-bg: #F4F7FA;
+}
+
+/* 3. Global Styling */
+@layer base {
+  body {
+    @apply font-sans bg-soft-bg text-navy;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Custom Scrollbar Premium */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #001F3F;
+  border-radius: 10px;
+}
+
+@theme {
+    --color-navy-dark: #001F3F;
+    --color-tumeric: #FFB800;
+}

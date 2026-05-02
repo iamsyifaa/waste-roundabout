@@ -1,0 +1,33 @@
+{
+  "name": "waste-roundabout",
+  "version": "1.0.0",
+  "description": "REST API untuk platform **Agri-Cycle** — marketplace limbah pertanian yang menghubungkan Petani (Farmer) dengan Pengepul (Collector). Petani memposting limbah, Pengepul membeli secara online via **Midtrans**, dan Petani mendapatkan poin reward serta **Badge Gamifikasi**.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iamsyifaa/waste-roundabout.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/iamsyifaa/waste-roundabout/issues"
+  },
+  "homepage": "https://github.com/iamsyifaa/waste-roundabout#readme",
+  "dependencies": {
+    "@vitejs/plugin-react": "^6.0.1",
+    "lucide-react": "^1.14.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "vite": "^8.0.10"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3"
+  }
+}
